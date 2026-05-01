@@ -3,10 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Wentworth West Satellite Planner</title>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-
+<title>Wentworth West Course Planner</title>
 <style>
 :root{
   --bg:#07130f;
@@ -15,23 +12,30 @@
   --muted:#abc4b7;
   --gold:#d6b56d;
   --line:#274c3a;
+  --fair:#54a65d;
+  --fair2:#69bd6f;
+  --rough:#24562f;
+  --deep:#123520;
+  --water:#5ca8e8;
+  --sand:#e8d59c;
 }
 *{box-sizing:border-box}
 body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;
-  background:var(--bg);
+  background:radial-gradient(circle at 10% -8%,#244d39,transparent 28%),var(--bg);
   color:var(--text);
 }
 header{
   position:sticky;
   top:0;
-  z-index:1000;
+  z-index:5;
   background:#07130fee;
   border-bottom:1px solid var(--line);
+  backdrop-filter:blur(8px);
 }
 .wrap{
-  max-width:1200px;
+  max-width:1150px;
   margin:auto;
   padding:14px;
 }
@@ -51,9 +55,7 @@ p{line-height:1.45}
   align-items:center;
   margin-top:10px;
 }
-select,input,button,textarea{
-  font:inherit;
-}
+select,input,button,textarea{font:inherit}
 select,input{
   background:#07130f;
   color:var(--text);
@@ -75,17 +77,12 @@ button{
   color:var(--text);
   border:1px solid var(--line);
 }
-.danger{
-  background:#401b1b;
-  color:#ffdede;
-  border:1px solid #7c3333;
-}
 main{
-  max-width:1200px;
+  max-width:1150px;
   margin:auto;
   padding:14px;
   display:grid;
-  grid-template-columns:310px 1fr;
+  grid-template-columns:300px 1fr;
   gap:14px;
 }
 .card{
@@ -93,6 +90,7 @@ main{
   border:1px solid var(--line);
   border-radius:20px;
   padding:14px;
+  box-shadow:0 18px 40px rgba(0,0,0,.22);
 }
 .stats{
   display:grid;
@@ -143,16 +141,16 @@ main{
 }
 .layout{
   display:grid;
-  grid-template-columns:1fr 300px;
+  grid-template-columns:1fr 285px;
   gap:12px;
 }
 #map{
   width:100%;
-  height:clamp(420px,65vh,650px);
+  height:clamp(380px,58vh,530px);
+  background:#0b2418;
   border:1px solid var(--line);
   border-radius:20px;
-  overflow:hidden;
-  background:#0b2418;
+  touch-action:none;
 }
 .box{
   background:#07130f;
@@ -229,21 +227,6 @@ td:last-child{
   border-right:1px solid var(--line);
   border-radius:0 10px 10px 0;
 }
-.leaflet-control-attribution{
-  font-size:10px;
-}
-.leaflet-popup-content{
-  font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;
-}
-.marker-label{
-  background:#07130f;
-  color:#edf8ef;
-  border:1px solid #d6b56d;
-  border-radius:999px;
-  padding:4px 8px;
-  font-weight:800;
-  box-shadow:0 4px 12px rgba(0,0,0,.35);
-}
 @media(max-width:950px){
   main,.layout{grid-template-columns:1fr}
   .holes{grid-template-columns:repeat(6,1fr)}
@@ -251,7 +234,7 @@ td:last-child{
 @media(max-width:650px){
   .holes{grid-template-columns:repeat(3,1fr)}
   .notes{grid-template-columns:1fr}
-  #map{height:430px}
+  #map{height:390px}
 }
 @media print{
   header,.side,.controls{display:none}
@@ -274,9 +257,8 @@ td:last-child{
 
 <header>
   <div class="wrap">
-    <h1>Wentworth West Course Satellite Planner</h1>
-    <p class="muted">Satellite version. Select a hole, drag the tee and green markers if required, then tap the map to plot your shots. Distances are map-based planning estimates in yards.</p>
-
+    <h1>Wentworth West Course Planner</h1>
+    <p class="muted">Illustrated premium version. Tap the hole map to plot shots. Distances are planning estimates from the selected tee, not GPS.</p>
     <div class="controls">
       <label>Tee
         <select id="tee">
@@ -286,14 +268,11 @@ td:last-child{
           <option>Red</option>
         </select>
       </label>
-
       <label>Handicap
         <input id="hcp" type="number" value="26.2" min="0" max="54" step="0.1" style="width:85px">
       </label>
-
       <button onclick="window.print()">Print</button>
-      <button class="secondary" id="resetShots">Reset shots</button>
-      <button class="secondary" id="resetMarkers">Reset tee/green</button>
+      <button class="secondary" id="reset">Reset this hole</button>
     </div>
   </div>
 </header>
@@ -313,7 +292,7 @@ td:last-child{
 
     <div class="box">
       <h3>How to use</h3>
-      <p class="muted">Each hole opens on the satellite map. Drag the gold tee marker and white flag marker to refine the hole. Tap the map to add shot landing points.</p>
+      <p class="muted">Select a hole, then tap the illustrated map to add landing points. Your shots and notes save automatically in this browser.</p>
     </div>
 
     <div class="box">
@@ -340,12 +319,12 @@ td:last-child{
 
     <div class="layout">
       <div>
-        <div id="map"></div>
+        <svg id="map" viewBox="0 0 500 900"></svg>
 
         <div class="notes">
           <div>
             <span class="pill">Personal plan</span>
-            <textarea id="personal" placeholder="Example: driver to right half, lay up to 90y, middle green."></textarea>
+            <textarea id="personal" placeholder="Example: hybrid to fairway, lay up to 90y, middle green."></textarea>
           </div>
 
           <div>
@@ -373,71 +352,64 @@ td:last-child{
   </section>
 </main>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
 const data = [
-  [1,5,16,433,425,393,388,'Bunkers left and right. Trees catch the loose drive.','Member par 5. Favour position over maximum distance.','Semi-blind approach. Treat the green as a controlled landing target.'],
-  [2,3,14,141,123,119,110,'Ravine carry. Right bunker is awkward.','Short par 3. Middle green is the best default.','Small target. Avoid being short if the front is playing soft.'],
-  [3,4,2,410,404,380,344,'Trouble left and bunkers right.','Very hard hole. Hit fairway first, score second.','Severely contoured with a slope through the middle.'],
-  [4,5,18,455,443,395,393,'Bunkers protect the green.','Birdie chance if tee shot is away. Decide attack or lay-up before teeing off.','Heavily contoured and bunker protected.'],
-  [5,3,8,168,147,135,123,'Short-siding is costly.','Distance control is the priority.','Slopes front-left to back-right.'],
-  [6,4,12,324,313,293,283,'Fairway bunkers dictate tee club.','Short par 4. Leave a comfortable full wedge.','Tricky sloping green. Fairway approach helps.'],
-  [7,4,10,362,347,287,303,'Blind tee shot and ditch risk.','Position hole. Hybrid or iron may be smarter than driver.','Two-tier green. Wrong tier leaves a hard putt.'],
-  [8,4,6,366,355,347,316,'Water short/left and bunkers right.','Accuracy hole. Lay back if driver brings the wrong miss in.','Narrow target. Centre green is sensible.'],
-  [9,4,4,411,400,389,390,'Demanding drive and front bunker.','Survival hole. Fairway and middle green.','Right side slopes away. Front bunker protects entrance.'],
-  [10,3,7,168,159,157,139,'Trees frame the tee shot.','Aim at the widest safe section.','Sloping green, left miss is poor.'],
-  [11,4,11,370,342,287,297,'Four fairway bunkers, gorse/rough left.','Birdie chance if bunkers are avoided.','Control spin and leave an uphill putt.'],
-  [12,5,17,465,434,423,415,'Water, trees and out of bounds influence risk.','Scoring hole after a committed tee shot.','Raised green, generally front to back.'],
-  [13,4,3,400,389,382,370,'Trees left block approach, right is also penal.','Right half of fairway gives best angle.','Diagonal green. Approach angle matters.'],
-  [14,3,9,164,149,108,106,'False front can reject short shots.','Club up for uphill and commit.','Runs strongly back to front with sections.'],
-  [15,4,1,440,419,369,373,'Out of bounds left, ditch/right trouble.','Hardest stroke index. Keep the ball in play.','Slopes right to left and is bunker guarded.'],
-  [16,4,5,350,340,328,321,'Fairway bunkers right, blocked from trees left.','Measured aggression. Fairway gives the scoring chance.','Relatively flat compared with surrounding holes.'],
-  [17,5,13,518,502,440,444,'Out of bounds left, trees right.','Risk/reward par 5. Lay up if the second is not clear.','Right run-off is severe. Short-left is often safer.'],
-  [18,5,15,476,449,439,430,'Lake fronts the green, bunker right.','Dramatic finisher. Attack only with a good number and lie.','Angled green behind water. Wind and pin are key.']
+  [1,5,16,433,425,393,388,'left','Bunkers left and right. Trees catch the loose drive.','Member par 5. Favour position over maximum distance.','Semi-blind approach. Treat the green as a controlled landing target.'],
+  [2,3,14,141,123,119,110,'straight','Ravine carry. Right bunker is awkward.','Short par 3. Middle green is the best default.','Small target. Avoid being short if the front is playing soft.'],
+  [3,4,2,410,404,380,344,'right','Trouble left and bunkers right.','Very hard hole. Hit fairway first, score second.','Severely contoured with a slope through the middle.'],
+  [4,5,18,455,443,395,393,'left','Bunkers protect the green.','Birdie chance if tee shot is away. Decide attack or lay-up before teeing off.','Heavily contoured and bunker protected.'],
+  [5,3,8,168,147,135,123,'straight','Short-siding is costly.','Distance control is the priority.','Slopes front-left to back-right.'],
+  [6,4,12,324,313,293,283,'right','Fairway bunkers dictate tee club.','Short par 4. Leave a comfortable full wedge.','Tricky sloping green. Fairway approach helps.'],
+  [7,4,10,362,347,287,303,'blind','Blind tee shot and ditch risk.','Position hole. Hybrid or iron may be smarter than driver.','Two-tier green. Wrong tier leaves a hard putt.'],
+  [8,4,6,366,355,347,316,'waterleft','Water short/left and bunkers right.','Accuracy hole. Lay back if driver brings the wrong miss in.','Narrow target. Centre green is sensible.'],
+  [9,4,4,411,400,389,390,'straight','Demanding drive and front bunker.','Survival hole. Fairway and middle green.','Right side slopes away. Front bunker protects entrance.'],
+  [10,3,7,168,159,157,139,'straight','Trees frame the tee shot.','Aim at the widest safe section.','Sloping green, left miss is poor.'],
+  [11,4,11,370,342,287,297,'uphill','Four fairway bunkers, gorse/rough left.','Birdie chance if bunkers are avoided.','Control spin and leave an uphill putt.'],
+  [12,5,17,465,434,423,415,'pines','Water, trees and out of bounds influence risk.','Scoring hole after a committed tee shot.','Raised green, generally front to back.'],
+  [13,4,3,400,389,382,370,'right','Trees left block approach, right is also penal.','Right half of fairway gives best angle.','Diagonal green. Approach angle matters.'],
+  [14,3,9,164,149,108,106,'uphill','False front can reject short shots.','Club up for uphill and commit.','Runs strongly back to front with sections.'],
+  [15,4,1,440,419,369,373,'left','Out of bounds left, ditch/right trouble.','Hardest stroke index. Keep the ball in play.','Slopes right to left and is bunker guarded.'],
+  [16,4,5,350,340,328,321,'right','Fairway bunkers right, blocked from trees left.','Measured aggression. Fairway gives the scoring chance.','Relatively flat compared with surrounding holes.'],
+  [17,5,13,518,502,440,444,'left','Out of bounds left, trees right.','Risk/reward par 5. Lay up if the second is not clear.','Right run-off is severe. Short-left is often safer.'],
+  [18,5,15,476,449,439,430,'dogleg','Lake fronts the green, bunker right.','Dramatic finisher. Attack only with a good number and lie.','Angled green behind water. Wind and pin are key.']
 ].map(x => ({
   n:x[0],
   par:x[1],
   si:x[2],
   tees:{White:x[3],Yellow:x[4],Green:x[5],Red:x[6]},
-  haz:x[7],
-  strategy:x[8],
-  green:x[9]
+  shape:x[7],
+  haz:x[8],
+  strategy:x[9],
+  green:x[10]
 }));
 
-/*
-Approximate starting coordinates for Wentworth West.
-These are designed to get each hole close on the satellite map.
-Drag tee and green markers to refine alignment.
-*/
-const defaultMarkers = {
-  1:{tee:[51.39795,-0.59235],green:[51.40075,-0.59075]},
-  2:{tee:[51.40075,-0.59075],green:[51.40135,-0.58980]},
-  3:{tee:[51.40135,-0.58980],green:[51.39895,-0.58760]},
-  4:{tee:[51.39895,-0.58760],green:[51.40225,-0.58625]},
-  5:{tee:[51.40225,-0.58625],green:[51.40310,-0.58545]},
-  6:{tee:[51.40310,-0.58545],green:[51.40155,-0.58390]},
-  7:{tee:[51.40155,-0.58390],green:[51.39915,-0.58295]},
-  8:{tee:[51.39915,-0.58295],green:[51.39705,-0.58475]},
-  9:{tee:[51.39705,-0.58475],green:[51.39520,-0.58730]},
-  10:{tee:[51.39520,-0.58730],green:[51.39610,-0.58820]},
-  11:{tee:[51.39610,-0.58820],green:[51.39785,-0.58950]},
-  12:{tee:[51.39785,-0.58950],green:[51.40160,-0.59210]},
-  13:{tee:[51.40160,-0.59210],green:[51.40380,-0.59100]},
-  14:{tee:[51.40380,-0.59100],green:[51.40445,-0.59000]},
-  15:{tee:[51.40445,-0.59000],green:[51.40205,-0.59365]},
-  16:{tee:[51.40205,-0.59365],green:[51.39980,-0.59470]},
-  17:{tee:[51.39980,-0.59470],green:[51.39635,-0.59270]},
-  18:{tee:[51.39635,-0.59270],green:[51.39795,-0.59235]}
+const holeDesigns = {
+  1:{tee:{x:250,y:850},pin:{x:268,y:87},rough:'M235 845 C150 740 135 615 175 500 C210 395 270 295 250 180 C242 135 250 100 265 70 L330 95 C315 130 315 170 325 215 C350 315 305 410 272 525 C240 635 260 740 340 840 Z',fairway:'M250 835 C190 735 185 620 212 510 C235 418 282 315 270 210 C265 160 270 120 280 90 L305 98 C295 126 292 162 298 205 C313 313 278 414 252 518 C225 625 228 730 278 828 Z',green:'M230 112 C205 100 205 70 230 58 C252 48 286 52 302 72 C315 88 308 108 286 118 C265 128 245 124 230 112 Z',bunkers:['M170 500 C150 485 150 455 172 445 C193 435 220 448 218 470 C216 492 190 510 170 500 Z','M320 450 C300 438 300 408 324 398 C346 390 370 404 368 426 C365 446 340 460 320 450 Z'],water:[],trees:[[105,705,26],[128,722,23],[96,646,22],[390,640,26],[415,660,22],[380,585,21],[110,330,24],[405,300,24]]},
+  2:{tee:{x:250,y:850},pin:{x:250,y:120},rough:'M170 850 C130 650 155 420 205 210 C220 150 245 105 270 80 L330 105 C285 230 300 470 335 850 Z',fairway:'M230 835 C210 650 220 430 245 210 C250 165 258 128 272 100 L295 110 C278 250 282 500 300 835 Z',green:'M215 150 C218 105 290 95 310 130 C322 160 285 185 245 178 C228 175 216 165 215 150 Z',bunkers:['M310 155 C330 143 354 155 350 177 C344 199 312 197 300 178 C294 167 300 160 310 155 Z'],water:['M0 500 C130 460 250 535 500 490 L500 560 C300 590 130 540 0 585 Z'],trees:[[95,650,25],[398,640,27],[110,330,22],[390,300,24]]},
+  3:{tee:{x:250,y:850},pin:{x:235,y:88},rough:'M250 850 C330 700 360 575 300 430 C255 315 180 230 235 70 L320 90 C250 240 355 330 360 470 C370 640 320 755 290 850 Z',fairway:'M260 835 C310 700 315 570 280 445 C245 325 210 230 248 95 L285 100 C255 245 325 340 326 460 C328 610 292 735 280 832 Z',green:'M215 110 C205 82 230 58 265 58 C302 58 322 82 312 112 C300 145 228 145 215 110 Z',bunkers:['M335 470 C315 455 315 425 340 415 C365 407 390 425 380 452 C372 474 352 482 335 470 Z','M175 250 C150 240 145 215 165 200 C190 185 220 202 215 225 C210 248 190 258 175 250 Z'],water:[],trees:[[105,680,28],[95,600,23],[410,650,28],[390,360,25],[100,250,28]]},
+  4:{tee:{x:250,y:850},pin:{x:280,y:92},rough:'M230 845 C150 700 165 560 220 430 C265 325 335 250 285 70 L360 100 C355 240 330 360 300 505 C270 650 292 750 350 845 Z',fairway:'M250 835 C205 710 205 590 242 460 C270 365 315 260 300 100 L326 108 C325 250 300 375 282 500 C262 640 275 742 305 830 Z',green:'M250 120 C230 98 242 65 282 60 C325 55 346 85 326 115 C310 138 270 138 250 120 Z',bunkers:['M225 140 C205 130 208 105 230 98 C250 92 268 105 262 124 C256 140 240 148 225 140 Z','M342 125 C325 110 330 88 354 84 C378 82 392 102 382 122 C372 140 356 140 342 125 Z'],water:[],trees:[[110,690,26],[390,700,24],[100,450,24],[410,430,26],[390,270,20]]},
+  5:{tee:{x:250,y:850},pin:{x:255,y:108},rough:'M180 850 C185 680 200 475 220 270 C228 180 240 110 265 75 L330 95 C295 250 290 510 330 850 Z',fairway:'M230 835 C235 660 240 460 250 245 C252 170 262 110 275 95 L302 103 C285 270 286 540 300 835 Z',green:'M220 140 C210 108 238 82 278 88 C315 94 330 125 305 150 C282 172 230 168 220 140 Z',bunkers:['M320 165 C300 150 305 125 328 120 C350 115 368 132 360 154 C352 175 335 177 320 165 Z'],water:[],trees:[[105,720,25],[405,710,25],[95,430,22],[400,420,22]]},
+  6:{tee:{x:250,y:850},pin:{x:235,y:90},rough:'M250 850 C325 710 360 575 300 430 C255 315 180 230 235 70 L310 90 C250 225 335 350 340 480 C348 635 306 755 282 850 Z',fairway:'M258 835 C305 705 310 580 282 450 C250 330 215 235 248 95 L280 102 C255 250 315 350 315 470 C316 620 285 740 275 832 Z',green:'M210 115 C200 88 225 62 262 58 C300 55 318 85 306 113 C292 142 225 145 210 115 Z',bunkers:['M335 472 C315 455 318 425 342 418 C365 410 386 428 378 452 C370 475 350 484 335 472 Z','M185 270 C160 262 155 235 175 220 C198 204 225 220 218 245 C212 265 195 275 185 270 Z'],water:[],trees:[[102,690,27],[410,680,27],[395,360,25],[100,310,25],[410,520,23]]},
+  7:{tee:{x:250,y:850},pin:{x:250,y:85},rough:'M250 850 C215 700 210 600 250 500 C290 390 290 250 250 70 L330 95 C330 250 330 400 295 520 C260 640 300 730 335 850 Z',fairway:'M255 835 C235 700 235 610 260 510 C290 395 285 250 265 95 L300 100 C310 250 308 390 282 510 C260 625 275 720 300 835 Z',green:'M220 112 C205 82 230 55 268 60 C306 65 323 92 305 120 C285 150 238 142 220 112 Z',bunkers:['M298 165 C318 152 342 162 340 188 C338 210 305 212 292 195 C282 180 286 170 298 165 Z'],water:['M70 560 C190 530 315 580 430 545'],trees:[[105,660,24],[398,650,27],[92,380,24],[405,360,23]]},
+  8:{tee:{x:250,y:850},pin:{x:250,y:95},rough:'M275 850 C310 690 305 540 260 410 C225 310 225 210 250 70 L330 90 C300 220 305 340 338 455 C380 600 350 730 330 850 Z',fairway:'M280 835 C295 690 285 560 250 430 C225 330 235 220 265 95 L300 102 C280 235 285 330 310 450 C340 590 320 720 305 835 Z',green:'M215 125 C205 95 235 70 275 78 C310 85 322 115 300 140 C275 168 225 155 215 125 Z',bunkers:['M325 145 C310 128 320 105 345 105 C370 105 382 130 365 148 C350 162 335 158 325 145 Z'],water:['M35 110 C115 70 190 120 150 215 C95 250 40 220 10 170 Z'],trees:[[105,700,25],[410,680,24],[105,430,25],[400,380,25]]},
+  9:{tee:{x:250,y:850},pin:{x:250,y:90},rough:'M220 850 C200 650 210 455 235 260 C245 165 260 100 280 70 L340 100 C310 235 310 485 330 850 Z',fairway:'M245 835 C235 650 238 455 258 255 C264 165 275 105 290 95 L314 105 C295 260 295 505 305 835 Z',green:'M218 118 C208 88 232 62 268 60 C308 58 328 90 310 120 C292 150 235 148 218 118 Z',bunkers:['M295 160 C320 145 350 162 342 190 C335 212 300 210 288 192 C278 175 282 166 295 160 Z','M185 535 C160 520 162 490 185 480 C210 468 232 488 225 512 C220 535 198 545 185 535 Z'],water:[],trees:[[105,700,26],[405,700,26],[95,380,25],[405,370,25]]},
+  10:{tee:{x:250,y:850},pin:{x:255,y:95},rough:'M185 850 C190 670 205 480 230 275 C240 175 250 110 270 70 L335 92 C300 245 295 520 330 850 Z',fairway:'M235 835 C235 665 242 475 258 260 C263 170 270 110 282 95 L305 102 C290 255 290 520 300 835 Z',green:'M220 130 C207 98 235 75 275 80 C314 84 330 115 305 142 C282 168 232 158 220 130 Z',bunkers:['M185 180 C165 168 170 145 192 138 C214 132 235 148 228 168 C222 188 200 192 185 180 Z'],water:[],trees:[[98,690,25],[410,690,25],[102,400,24],[400,380,25]]},
+  11:{tee:{x:250,y:850},pin:{x:268,y:95},rough:'M250 850 C270 690 260 530 250 390 C240 260 240 170 250 70 L330 92 C320 230 320 390 335 535 C350 680 335 760 310 850 Z',fairway:'M260 835 C270 690 265 535 260 400 C255 270 258 170 270 95 L300 100 C292 240 295 390 310 540 C325 690 310 770 295 835 Z',green:'M235 124 C220 94 244 66 282 68 C322 70 340 98 318 126 C298 150 254 150 235 124 Z',bunkers:['M200 540 C180 528 182 505 205 497 C228 490 246 506 240 527 C235 545 216 552 200 540 Z','M335 530 C315 518 318 493 340 485 C365 475 385 495 378 518 C370 540 350 544 335 530 Z','M310 320 C292 305 300 280 326 278 C350 276 364 300 350 318 C338 334 320 332 310 320 Z'],water:[],trees:[[90,690,28],[410,690,28],[95,360,25],[405,345,25]]},
+  12:{tee:{x:250,y:850},pin:{x:250,y:92},rough:'M250 850 C230 710 270 610 250 500 C230 365 270 245 250 70 L330 95 C310 240 340 365 325 500 C310 625 335 730 345 850 Z',fairway:'M260 835 C245 710 280 610 265 500 C250 365 282 245 270 95 L302 105 C295 250 315 365 300 500 C286 615 310 730 315 835 Z',green:'M220 120 C210 88 238 62 278 66 C315 70 330 98 308 128 C288 152 238 150 220 120 Z',bunkers:['M320 145 C300 132 305 108 328 102 C350 96 370 112 365 135 C360 155 340 160 320 145 Z'],water:['M60 310 C130 260 190 310 180 370 C170 430 90 420 55 370 C30 335 35 325 60 310 Z'],trees:[[100,710,26],[390,710,26],[100,520,25],[400,520,25],[98,300,24],[400,300,24]]},
+  13:{tee:{x:250,y:850},pin:{x:238,y:92},rough:'M250 850 C330 710 360 575 300 430 C255 315 180 230 235 70 L315 90 C250 230 335 350 340 480 C350 620 310 750 285 850 Z',fairway:'M260 835 C310 700 315 580 282 450 C250 335 215 235 248 95 L280 102 C256 245 315 350 318 470 C322 610 290 742 278 835 Z',green:'M205 120 C195 92 222 65 260 62 C300 60 318 90 300 120 C280 148 220 148 205 120 Z',bunkers:['M330 460 C312 444 318 420 342 415 C365 410 382 430 373 452 C365 470 345 475 330 460 Z'],water:[],trees:[[95,700,28],[410,690,27],[90,350,26],[410,360,26]]},
+  14:{tee:{x:250,y:850},pin:{x:255,y:100},rough:'M180 850 C190 650 205 430 225 250 C235 165 250 105 272 75 L335 95 C300 260 298 520 330 850 Z',fairway:'M232 835 C236 650 245 430 258 250 C264 165 275 105 286 95 L306 104 C290 270 292 520 302 835 Z',green:'M218 145 C200 108 232 82 275 86 C318 90 338 122 310 152 C285 180 232 172 218 145 Z',bunkers:['M195 170 C170 155 178 128 205 125 C230 122 245 145 230 165 C220 180 205 180 195 170 Z','M320 170 C300 155 308 128 334 125 C360 123 378 145 360 166 C348 180 332 180 320 170 Z'],water:[],trees:[[95,690,25],[410,690,25],[98,395,25],[402,400,24]]},
+  15:{tee:{x:250,y:850},pin:{x:270,y:95},rough:'M250 850 C170 700 150 560 210 430 C255 335 320 230 270 70 L350 98 C325 225 315 350 300 500 C285 650 320 750 370 850 Z',fairway:'M255 835 C205 700 195 580 235 450 C265 350 310 240 292 98 L320 106 C306 245 296 360 278 500 C262 640 295 745 320 835 Z',green:'M245 125 C225 98 242 66 282 62 C322 58 345 88 328 118 C310 148 265 148 245 125 Z',bunkers:['M335 140 C315 130 318 105 342 98 C365 92 385 110 378 132 C372 152 350 155 335 140 Z','M185 500 C165 488 168 460 192 452 C215 445 235 465 226 488 C218 508 200 515 185 500 Z'],water:['M352 570 C430 560 480 605 455 675 C430 740 345 715 330 650 C320 610 328 585 352 570 Z'],trees:[[95,690,28],[405,720,28],[95,360,25],[410,340,25]]},
+  16:{tee:{x:250,y:850},pin:{x:245,y:90},rough:'M250 850 C325 710 360 575 300 430 C255 315 180 230 235 70 L315 90 C255 230 330 350 335 475 C342 620 305 750 282 850 Z',fairway:'M258 835 C305 705 310 580 282 450 C250 330 215 235 248 95 L280 102 C255 250 315 350 315 470 C316 620 285 740 275 832 Z',green:'M215 120 C205 88 230 60 268 60 C306 60 325 90 305 118 C286 145 232 148 215 120 Z',bunkers:['M332 465 C312 450 316 420 342 415 C365 410 385 430 376 452 C368 470 348 478 332 465 Z','M180 290 C160 280 160 252 185 245 C208 238 230 256 222 278 C216 298 195 302 180 290 Z'],water:[],trees:[[98,680,27],[410,690,27],[95,360,24],[410,360,25]]},
+  17:{tee:{x:250,y:850},pin:{x:255,y:92},rough:'M240 850 C150 700 160 560 220 430 C275 315 330 240 285 70 L365 95 C340 245 310 365 300 510 C290 650 320 760 355 850 Z',fairway:'M255 835 C205 700 205 580 242 455 C275 345 315 250 300 96 L330 105 C315 260 292 370 282 510 C272 645 298 750 318 835 Z',green:'M225 120 C210 90 238 64 280 66 C320 68 338 98 315 126 C292 154 240 150 225 120 Z',bunkers:['M320 142 C300 130 305 105 330 100 C354 96 372 114 365 136 C358 155 338 160 320 142 Z'],water:[],trees:[[95,720,30],[410,720,28],[92,450,26],[410,455,26],[105,260,25],[395,260,25]]},
+  18:{tee:{x:250,y:850},pin:{x:275,y:92},rough:'M250 850 C360 680 365 540 305 420 C260 330 230 220 250 70 L335 95 C320 225 330 330 365 445 C405 585 365 720 320 850 Z',fairway:'M260 835 C330 680 330 555 285 440 C250 340 250 230 270 95 L305 105 C295 240 305 345 335 455 C365 585 330 720 295 835 Z',green:'M245 120 C225 95 242 65 285 62 C328 58 350 90 330 122 C310 150 265 148 245 120 Z',bunkers:['M345 145 C328 132 332 108 355 104 C378 100 392 120 382 142 C372 160 355 160 345 145 Z'],water:['M40 90 C150 50 220 95 200 180 C178 275 55 260 15 180 C-10 130 0 105 40 90 Z','M210 160 C280 120 360 150 380 220 C395 280 315 325 250 285 C205 258 180 200 210 160 Z'],trees:[[95,720,27],[410,710,27],[90,480,24],[410,475,24],[400,310,25]]}
 };
 
 let cur = 1;
 let tee = 'Yellow';
 
-let state = JSON.parse(localStorage.getItem('wentworthSatellitePlanner') || 'null') || {
+let state = JSON.parse(localStorage.getItem('wentworthPlannerIllustratedV2') || 'null') || {
   shots:{},
   notes:{},
-  markers:{},
   clubs:{
     Driver:230,
     '3 Wood':205,
@@ -453,39 +425,9 @@ let state = JSON.parse(localStorage.getItem('wentworthSatellitePlanner') || 'nul
 
 const $ = id => document.getElementById(id);
 const H = () => data[cur - 1];
-const save = () => localStorage.setItem('wentworthSatellitePlanner', JSON.stringify(state));
-
-let map;
-let teeMarker;
-let greenMarker;
-let shotMarkers = [];
-let shotLine;
-let distanceLabels = [];
-
-const teeIcon = L.divIcon({
-  className:'',
-  html:'<div class="marker-label">TEE</div>',
-  iconSize:[50,28],
-  iconAnchor:[25,14]
-});
-
-const greenIcon = L.divIcon({
-  className:'',
-  html:'<div class="marker-label">⚑</div>',
-  iconSize:[38,28],
-  iconAnchor:[19,14]
-});
-
-const shotIcon = number => L.divIcon({
-  className:'',
-  html:'<div class="marker-label">' + number + '</div>',
-  iconSize:[32,28],
-  iconAnchor:[16,14]
-});
+const save = () => localStorage.setItem('wentworthPlannerIllustratedV2', JSON.stringify(state));
 
 function init(){
-  initMap();
-
   $('tee').onchange = e => {
     tee = e.target.value;
     render();
@@ -503,18 +445,10 @@ function init(){
     render();
   };
 
-  $('resetShots').onclick = () => {
+  $('reset').onclick = () => {
     state.shots[cur] = [];
     save();
-    renderMapItems();
-    renderShots();
-    renderHead();
-  };
-
-  $('resetMarkers').onclick = () => {
-    delete state.markers[cur];
-    save();
-    renderMapItems();
+    render();
   };
 
   ['personal','after'].forEach(id => {
@@ -527,32 +461,6 @@ function init(){
 
   renderClubs();
   render();
-}
-
-function initMap(){
-  map = L.map('map', {
-    zoomControl:true,
-    attributionControl:true
-  }).setView([51.3994,-0.5898], 16);
-
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom:19,
-    attribution:'Tiles &copy; Esri'
-  }).addTo(map);
-
-  map.on('click', e => {
-    addShotPoint(e.latlng);
-  });
-}
-
-function getMarkersForHole(holeNo){
-  if(state.markers[holeNo]) return state.markers[holeNo];
-  return JSON.parse(JSON.stringify(defaultMarkers[holeNo]));
-}
-
-function setMarkersForHole(holeNo, markers){
-  state.markers[holeNo] = markers;
-  save();
 }
 
 function strokes(hcp, si){
@@ -583,7 +491,7 @@ function renderClubs(){
 function render(){
   renderButtons();
   renderHead();
-  renderMapItems();
+  renderMap();
   renderShots();
   renderScore();
   renderStroke();
@@ -621,135 +529,168 @@ function renderHead(){
   $('haz').textContent = h.haz;
   $('yards').textContent = data.reduce((s,x) => s + x.tees[tee], 0);
   $('hcpOut').textContent = Math.round(hcp);
-  $('points').textContent = (state.shots[cur] || []).length;
+  $('points').textContent = Object.values(state.shots).reduce((s,a) => s + (a ? a.length : 0), 0);
 
   let n = state.notes[h.n] || {};
   $('personal').value = n.personal || '';
   $('after').value = n.after || '';
 }
 
-function renderMapItems(){
-  clearMapItems();
-
+function renderMap(){
+  let s = $('map');
   let h = H();
-  let markers = getMarkersForHole(h.n);
+  let d = holeDesigns[h.n];
+  let shots = state.shots[h.n] || [];
 
-  teeMarker = L.marker(markers.tee, {
-    draggable:true,
-    icon:teeIcon
-  }).addTo(map).bindPopup('Drag tee marker to refine position');
+  s.innerHTML = `
+    <defs>
+      <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#143524"/>
+        <stop offset="100%" stop-color="#0b2418"/>
+      </linearGradient>
 
-  greenMarker = L.marker(markers.green, {
-    draggable:true,
-    icon:greenIcon
-  }).addTo(map).bindPopup('Drag green marker to refine position');
+      <linearGradient id="fairwayGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4f9b57"/>
+        <stop offset="50%" stop-color="#69bd6f"/>
+        <stop offset="100%" stop-color="#4d9550"/>
+      </linearGradient>
 
-  teeMarker.on('dragend', saveMarkerPositions);
-  greenMarker.on('dragend', saveMarkerPositions);
+      <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7fd47b"/>
+        <stop offset="100%" stop-color="#5aac5e"/>
+      </linearGradient>
 
-  fitHoleView();
-  drawShotsOnMap();
-}
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.35"/>
+      </filter>
 
-function clearMapItems(){
-  if(teeMarker) map.removeLayer(teeMarker);
-  if(greenMarker) map.removeLayer(greenMarker);
-  shotMarkers.forEach(m => map.removeLayer(m));
-  shotMarkers = [];
-  if(shotLine) map.removeLayer(shotLine);
-  shotLine = null;
-  distanceLabels.forEach(m => map.removeLayer(m));
-  distanceLabels = [];
-}
+      <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.2"/>
+      </filter>
+    </defs>
 
-function saveMarkerPositions(){
-  setMarkersForHole(cur, {
-    tee:[teeMarker.getLatLng().lat, teeMarker.getLatLng().lng],
-    green:[greenMarker.getLatLng().lat, greenMarker.getLatLng().lng]
-  });
-  drawShotsOnMap();
-  renderShots();
-}
+    <rect width="500" height="900" fill="url(#bgGrad)"/>
 
-function fitHoleView(){
-  let bounds = L.latLngBounds([teeMarker.getLatLng(), greenMarker.getLatLng()]);
-  let shots = state.shots[cur] || [];
-  shots.forEach(p => bounds.extend(L.latLng(p.lat, p.lng)));
-  map.fitBounds(bounds.pad(0.45), {animate:false});
-}
+    <g opacity="0.08">
+      <circle cx="70" cy="110" r="100" fill="#ffffff"/>
+      <circle cx="420" cy="250" r="125" fill="#ffffff"/>
+      <circle cx="120" cy="720" r="110" fill="#ffffff"/>
+      <circle cx="410" cy="790" r="130" fill="#ffffff"/>
+    </g>
 
-function addShotPoint(latlng){
-  let a = state.shots[cur] || [];
-  a.push({lat:latlng.lat, lng:latlng.lng});
-  state.shots[cur] = a;
-  save();
-  renderMapItems();
-  renderShots();
-  renderHead();
-}
+    <path d="${d.rough}" fill="#2c5e33"/>
+    <path d="${d.fairway}" fill="url(#fairwayGrad)" filter="url(#softShadow)"/>
 
-function drawShotsOnMap(){
-  shotMarkers.forEach(m => map.removeLayer(m));
-  shotMarkers = [];
+    <path d="M${d.tee.x + 10} ${d.tee.y - 18}
+             C${d.tee.x - 25} ${d.tee.y - 130}, ${d.pin.x + 25} ${d.pin.y + 225}, ${d.pin.x} ${d.pin.y + 55}"
+          fill="none"
+          stroke="#85d387"
+          stroke-width="15"
+          stroke-linecap="round"
+          opacity="0.22"/>
+  `;
 
-  if(shotLine){
-    map.removeLayer(shotLine);
-    shotLine = null;
+  if(d.water && d.water.length){
+    d.water.forEach(w => {
+      if(w.startsWith('M')){
+        s.insertAdjacentHTML('beforeend', '<path d="' + w + '" fill="#5ca8e8" opacity="0.85" filter="url(#softShadow)"/>');
+      } else {
+        s.insertAdjacentHTML('beforeend', '<path d="' + w + '" fill="none" stroke="#5ca8e8" stroke-width="12" stroke-linecap="round" opacity="0.85"/>');
+      }
+    });
   }
 
-  distanceLabels.forEach(m => map.removeLayer(m));
-  distanceLabels = [];
+  if(d.bunkers && d.bunkers.length){
+    d.bunkers.forEach(b => {
+      s.insertAdjacentHTML('beforeend', '<path d="' + b + '" fill="#e8d59c" filter="url(#shadow)"/>');
+    });
+  }
 
-  let shots = state.shots[cur] || [];
-  let points = [
-    teeMarker.getLatLng(),
-    ...shots.map(p => L.latLng(p.lat, p.lng)),
-    greenMarker.getLatLng()
-  ];
+  if(d.trees && d.trees.length){
+    s.insertAdjacentHTML('beforeend', '<g filter="url(#softShadow)">');
+    d.trees.forEach(t => {
+      s.insertAdjacentHTML('beforeend',
+        '<circle cx="' + t[0] + '" cy="' + t[1] + '" r="' + t[2] + '" fill="#143c24"/>' +
+        '<circle cx="' + (t[0] + 16) + '" cy="' + (t[1] + 11) + '" r="' + Math.max(16,t[2]-5) + '" fill="#10351f"/>'
+      );
+    });
+    s.insertAdjacentHTML('beforeend', '</g>');
+  }
+
+  s.insertAdjacentHTML('beforeend', `
+    <path d="${d.green}" fill="url(#greenGrad)" filter="url(#shadow)"/>
+    <path d="M${d.pin.x - 38} ${d.pin.y + 8} C${d.pin.x - 10} ${d.pin.y - 2}, ${d.pin.x + 25} ${d.pin.y - 2}, ${d.pin.x + 44} ${d.pin.y + 12}"
+          fill="none"
+          stroke="#b8efb0"
+          stroke-width="3"
+          opacity="0.35"/>
+
+    <circle cx="${d.pin.x}" cy="${d.pin.y}" r="4" fill="#fff"/>
+    <path d="M${d.pin.x} ${d.pin.y} L${d.pin.x} ${d.pin.y - 39}" stroke="#fff" stroke-width="2"/>
+    <path d="M${d.pin.x} ${d.pin.y - 39} L${d.pin.x + 24} ${d.pin.y - 29} L${d.pin.x} ${d.pin.y - 19} Z" fill="#d64242"/>
+
+    <rect x="${d.tee.x - 60}" y="${d.tee.y - 18}" width="120" height="36" rx="14" fill="#d6b56d"/>
+    <text x="${d.tee.x}" y="${d.tee.y + 5}" text-anchor="middle" font-size="18" font-weight="800" fill="#111">${tee} tee</text>
+
+    <rect x="18" y="18" width="120" height="36" rx="14" fill="rgba(7,19,15,0.78)" stroke="#d6b56d"/>
+    <text x="78" y="42" text-anchor="middle" font-size="16" font-weight="900" fill="#d6b56d">Hole ${h.n}</text>
+  `);
+
+  drawShotOverlay(s, h, d, shots);
+  s.onclick = addPoint;
+}
+
+function drawShotOverlay(s, h, d, shots){
+  let pts = [d.tee, ...shots, d.pin];
+
+  for(let i = 0; i < pts.length - 1; i++){
+    let a = pts[i];
+    let b = pts[i + 1];
+    let yards = Math.round(dist(a, b, h.tees[tee]));
+
+    s.insertAdjacentHTML('beforeend',
+      '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#f7e4a2" stroke-width="5" stroke-linecap="round"/>' +
+      '<text x="' + ((a.x + b.x) / 2) + '" y="' + ((a.y + b.y) / 2 - 10) + '" text-anchor="middle" font-size="20" font-weight="900" fill="#fff" stroke="#07130f" stroke-width="5" paint-order="stroke">' + yards + 'y</text>'
+    );
+  }
 
   shots.forEach((p,i) => {
-    let marker = L.marker([p.lat,p.lng], {
-      draggable:true,
-      icon:shotIcon(i + 1)
-    }).addTo(map);
+    s.insertAdjacentHTML('beforeend',
+      '<circle cx="' + p.x + '" cy="' + p.y + '" r="16" fill="#f7e4a2" stroke="#111" stroke-width="3"/>' +
+      '<text x="' + p.x + '" y="' + (p.y + 6) + '" text-anchor="middle" font-size="15" font-weight="900" fill="#111">' + (i + 1) + '</text>'
+    );
+  });
+}
 
-    marker.on('dragend', e => {
-      let pos = e.target.getLatLng();
-      state.shots[cur][i] = {lat:pos.lat,lng:pos.lng};
-      save();
-      drawShotsOnMap();
-      renderShots();
+function svgpt(e){
+  let s = $('map');
+  let p = s.createSVGPoint();
+  p.x = e.clientX;
+  p.y = e.clientY;
+  return p.matrixTransform(s.getScreenCTM().inverse());
+}
+
+function addPoint(e){
+  let p = svgpt(e);
+  let a = state.shots[cur] || [];
+
+  if(p.y > 95 && p.y < 835){
+    a.push({
+      x:Math.max(40, Math.min(460, p.x)),
+      y:Math.max(105, Math.min(825, p.y))
     });
 
-    shotMarkers.push(marker);
-  });
-
-  if(points.length > 1){
-    shotLine = L.polyline(points, {
-      color:'#f7e4a2',
-      weight:4,
-      opacity:0.95
-    }).addTo(map);
+    a.sort((x,y) => y.y - x.y);
+    state.shots[cur] = a;
+    save();
+    render();
   }
+}
 
-  for(let i = 0; i < points.length - 1; i++){
-    let a = points[i];
-    let b = points[i + 1];
-    let mid = L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
-    let yards = Math.round(a.distanceTo(b) * 1.09361);
-
-    let label = L.marker(mid, {
-      interactive:false,
-      icon:L.divIcon({
-        className:'',
-        html:'<div class="marker-label">' + yards + 'y</div>',
-        iconSize:[70,28],
-        iconAnchor:[35,14]
-      })
-    }).addTo(map);
-
-    distanceLabels.push(label);
-  }
+function dist(a,b,total){
+  let v = Math.abs(a.y - b.y) / 780 * total;
+  let l = Math.abs(a.x - b.x) / 500 * total * .34;
+  return Math.sqrt(v * v + l * l);
 }
 
 function nearest(y){
@@ -768,33 +709,21 @@ function nearest(y){
 
 function renderShots(){
   let h = H();
+  let d = holeDesigns[h.n];
+  let a = state.shots[cur] || [];
   let box = $('shots');
-  let shots = state.shots[cur] || [];
-
-  if(!teeMarker || !greenMarker){
-    box.innerHTML = '<p class="muted">Loading map.</p>';
-    return;
-  }
-
-  let points = [
-    teeMarker.getLatLng(),
-    ...shots.map(p => L.latLng(p.lat,p.lng)),
-    greenMarker.getLatLng()
-  ];
+  let pts = [d.tee, ...a, d.pin];
 
   box.innerHTML = '';
 
-  if(points.length === 2){
-    let total = Math.round(points[0].distanceTo(points[1]) * 1.09361);
-    box.innerHTML =
-      '<p class="muted">No shots plotted yet.</p>' +
-      '<div class="shot"><span>Tee to green</span><b>' + total + 'y</b></div>';
+  if(pts.length === 2){
+    box.innerHTML = '<p class="muted">No shots plotted yet.</p>';
     return;
   }
 
-  for(let i = 0; i < points.length - 1; i++){
-    let d = Math.round(points[i].distanceTo(points[i + 1]) * 1.09361);
-    box.innerHTML += '<div class="shot"><span>Shot ' + (i + 1) + '</span><b>' + d + 'y - ' + nearest(d) + '</b></div>';
+  for(let i = 0; i < pts.length - 1; i++){
+    let yards = Math.round(dist(pts[i], pts[i + 1], h.tees[tee]));
+    box.innerHTML += '<div class="shot"><span>Shot ' + (i + 1) + '</span><b>' + yards + 'y - ' + nearest(yards) + '</b></div>';
   }
 }
 
@@ -835,8 +764,7 @@ function renderStroke(){
   let hcp = +$('hcp').value || 0;
   let box = $('strokeBadges');
 
-  $('strokeText').textContent =
-    'Approximate allocation using handicap ' + hcp + ' and men’s stroke index. Use your official playing handicap on the day for competition scoring.';
+  $('strokeText').textContent = 'Approximate allocation using handicap ' + hcp + ' and men’s stroke index. Use your official playing handicap on the day for competition scoring.';
 
   box.innerHTML = '';
 
@@ -855,5 +783,6 @@ function renderStroke(){
 
 init();
 </script>
+
 </body>
 </html>
